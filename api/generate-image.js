@@ -34,6 +34,10 @@ export async function POST(request) {
         );
     }
 
+    // 约束：不在图中生成任何文字，避免乱码
+    const noTextInstruction = 'Important: The image must not contain any text, words, letters, signs, labels, captions, or writing. No text overlay. Pure visual scene only. ';
+    const finalPrompt = noTextInstruction + prompt;
+
     // Prefer environment variable, then user input, then default (image-capable model)
     // Use google/gemini-2.5-flash-image; -preview suffix can 404 on OpenRouter
     const model = process.env.OPENROUTER_IMAGE_MODEL || userModel || 'google/gemini-2.5-flash-image';
@@ -43,7 +47,7 @@ export async function POST(request) {
         messages: [
             {
                 role: 'user',
-                content: prompt
+                content: finalPrompt
             }
         ],
         // OpenRouter: use ["image", "text"] for multimodal models (e.g. Gemini)
