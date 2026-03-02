@@ -34,8 +34,8 @@ export async function POST(request) {
         );
     }
 
-    // Prefer environment variable, then user input, then default
-    const model = process.env.OPENROUTER_IMAGE_MODEL || userModel || 'google/gemini-2.0-flash-exp';
+    // Prefer environment variable, then user input, then default (image-capable model)
+    const model = process.env.OPENROUTER_IMAGE_MODEL || userModel || 'google/gemini-2.5-flash-image-preview';
 
     const payload = {
         model,
@@ -45,8 +45,8 @@ export async function POST(request) {
                 content: prompt
             }
         ],
-        // OpenRouter specific parameter for image generation
-        modalities: ["image"]
+        // OpenRouter: use ["image", "text"] for multimodal models (e.g. Gemini)
+        modalities: ["image", "text"]
     };
 
     try {
