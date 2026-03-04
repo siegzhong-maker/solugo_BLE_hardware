@@ -2835,16 +2835,37 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             let slotsHTML = '';
             for (let i = 0; i < slots; i++) {
                 const { item, origIdx } = group[i] || {};
-                if (item && (item.scene || item.location)) {
-                    const { short: shortLabel, full: fullLabel } = getShortLabel(item);
-                    const imgSrc = item.scene ? item.scene.image : 'assets/cabinet-empty.svg';
-                    slotsHTML += `
-                        <div class="cabinet-slot bg-white/50 backdrop-blur-sm cursor-pointer relative" data-item-index="${origIdx}">
-                            <span class="absolute top-0.5 right-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${tierClass}">${tier}</span>
-                            <div class="cabinet-slot__media"><img src="${imgSrc}" alt="${escapeHtml(fullLabel)}" class="drop-shadow-sm"></div>
-                            <span class="w-full min-w-0 line-clamp-3 text-center" title="${escapeHtml(fullLabel)}">${escapeHtml(shortLabel)}</span>
-                        </div>
-                    `;
+                if (item) {
+                    // 家具类型：使用 name + image 渲染，保持与 renderCabinetGrid 一致
+                    if (item.type === 'furniture') {
+                        const fullLabel = item.name || '纪念品';
+                        const shortLabel = fullLabel;
+                        const imgSrc = item.image;
+                        slotsHTML += `
+                            <div class="cabinet-slot bg-white/50 backdrop-blur-sm cursor-pointer relative" data-item-index="${origIdx}">
+                                <span class="absolute top-0.5 right-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${tierClass}">${tier}</span>
+                                <div class="cabinet-slot__media"><img src="${imgSrc}" alt="${escapeHtml(fullLabel)}" class="drop-shadow-sm rounded-xl border border-[#d4c4a8]"></div>
+                                <span class="w-full min-w-0 line-clamp-3 text-center" title="${escapeHtml(fullLabel)}">${escapeHtml(shortLabel)}</span>
+                            </div>
+                        `;
+                    } else if (item.scene || item.location) {
+                        const { short: shortLabel, full: fullLabel } = getShortLabel(item);
+                        const imgSrc = item.scene ? item.scene.image : 'assets/cabinet-empty.svg';
+                        slotsHTML += `
+                            <div class="cabinet-slot bg-white/50 backdrop-blur-sm cursor-pointer relative" data-item-index="${origIdx}">
+                                <span class="absolute top-0.5 right-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${tierClass}">${tier}</span>
+                                <div class="cabinet-slot__media"><img src="${imgSrc}" alt="${escapeHtml(fullLabel)}" class="drop-shadow-sm"></div>
+                                <span class="w-full min-w-0 line-clamp-3 text-center" title="${escapeHtml(fullLabel)}">${escapeHtml(shortLabel)}</span>
+                            </div>
+                        `;
+                    } else {
+                        slotsHTML += `
+                            <div class="cabinet-slot cabinet-slot--empty">
+                                <div class="cabinet-slot__media"><i class="ph-bold ph-server text-3xl cabinet-empty-icon opacity-40"></i></div>
+                                <span class="scale-90">去旅行解锁</span>
+                            </div>
+                        `;
+                    }
                 } else {
                     slotsHTML += `
                         <div class="cabinet-slot cabinet-slot--empty">
