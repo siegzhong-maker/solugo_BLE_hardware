@@ -98,7 +98,7 @@ const INTERACTION_ANCHORS = {
 | **wait** | IDLE_WAIT | `flog_dengdai_` | 在门口等待、期待出门 |
 | **observe** | IDLE_OBSERVE | `flog_guancha_` | 查看橱柜、阅读日记 |
 
-> **注意**：文件名存在 `frog` (青蛙?) 和 `flog` 的拼写混用（可能是 typo），代码中需做兼容处理或统一重命名。
+> **注意**：文件名存在 `frog` (青蛙?) 和 `flog` 的拼写混用（可能是 typo），代码中需做兼容处理或统一重命名。行为决策与上述动画 key（rest / idle_wait / idle_observe / interact / idle_breath）的对应关系见「行为决策与比卡丘动画导出全面联动」方案。
 
 ### 2.5 交互流程图 (State Flow)
 

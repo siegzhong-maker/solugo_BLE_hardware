@@ -2181,7 +2181,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             position: { left: '46%', bottom: '62%' },
             context: '跑到门口，准备和陪我旅行的人一起出门探索',
             stayMs: 800,
-            animationState: 'door',
+            animationState: 'idle_wait',
             resultingState: PET_STATES.INTERACT,
             vibrationPattern: 'wait_mild',
             moodDelta: 5,
@@ -2191,7 +2191,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             position: { bottom: '25%', left: '20%' },
             context: '凑到橱柜前看看收藏的小物件',
             stayMs: 2200,
-            animationState: 'idle_breath',
+            animationState: 'idle_observe',
             resultingState: PET_STATES.IDLE_OBSERVE,
             vibrationPattern: 'happy_short',
             moodDelta: 5,
@@ -2386,7 +2386,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                                 updateMoodAndHealth(preset.moodDelta, preset.healthDelta);
                             }
                         }
-                        setPetState(resultingState, { skipInactivityReset: false });
+                        setPetState(resultingState, { skipInactivityReset: false, animationOverride: preset ? preset.animationState : null });
                     }
                 });
             } else if (position) {
@@ -2397,7 +2397,7 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                         updateMoodAndHealth(preset.moodDelta, preset.healthDelta);
                     }
                 }
-                setPetState(resultingState);
+                setPetState(resultingState, { animationOverride: preset ? preset.animationState : null });
             } else {
                 if (context) {
                     triggerAIPetAction(context);
@@ -2542,29 +2542,36 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
         switch (nextState) {
             case PET_STATES.IDLE_WAIT:
                 updatePetStatus('伸懒腰准备出发～');
-                playPetAnimation('idle_wait', { loop: false, frameInterval: 120, cycles: 2 });
+                if (!options.animationOverride) playPetAnimation('idle_wait', { loop: false, frameInterval: 120, cycles: 2 });
                 schedulePetTransition(PET_STATES.IDLE_BREATH, 2800);
                 break;
             case PET_STATES.IDLE_BREATH:
                 updatePetStatus('比卡丘在发呆放空中…');
-                playPetAnimation('idle_breath', { loop: true, frameInterval: 130 });
+                if (!options.animationOverride) playPetAnimation('idle_breath', { loop: true, frameInterval: 130 });
                 break;
             case PET_STATES.IDLE_OBSERVE:
                 updatePetStatus('比卡丘在看着你哦～');
-                playPetAnimation('idle_observe', { loop: false, frameInterval: 120, cycles: 2 });
+                if (!options.animationOverride) playPetAnimation('idle_observe', { loop: false, frameInterval: 120, cycles: 2 });
                 schedulePetTransition(PET_STATES.IDLE_BREATH, 4000);
                 break;
             case PET_STATES.INTERACT:
                 updatePetStatus('比卡丘超开心！');
-                playPetAnimation('interact', { loop: false, frameInterval: 90, cycles: 2 });
+                if (!options.animationOverride) playPetAnimation('interact', { loop: false, frameInterval: 90, cycles: 2 });
                 schedulePetTransition(PET_STATES.IDLE_BREATH, 3200);
                 break;
             case PET_STATES.REST:
                 updatePetStatus('比卡丘睡着啦…');
-                playPetAnimation('rest', { loop: true, frameInterval: 150 });
+                if (!options.animationOverride) playPetAnimation('rest', { loop: true, frameInterval: 150 });
                 break;
             default:
-                playPetAnimation('idle_breath', { loop: true, frameInterval: 130 });
+                if (!options.animationOverride) playPetAnimation('idle_breath', { loop: true, frameInterval: 130 });
+        }
+
+        if (options.animationOverride) {
+            const k = options.animationOverride;
+            const loop = k === 'idle_breath' || k === 'rest' || k === 'idle_observe' || k === 'idle_wait';
+            const interval = k === 'idle_breath' ? 800 : (k === 'rest' ? 150 : (k === 'idle_wait' ? 220 : 130));
+            playPetAnimation(k, { loop, frameInterval: interval });
         }
 
         if (!options.skipInactivityReset && nextState !== PET_STATES.REST) {
@@ -2925,9 +2932,8 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
         const resetToDefault = !!options.resetToDefault;
         const animationState = options.animationState || null;
 
-        if (animationState) {
-            playPetAnimation(animationState, { loop: false, frameInterval: 220 });
-        }
+        // 行走期间不播目标点动画，仅播呼吸帧，到达后再播热点对应动画
+        playPetAnimation('idle_breath', { loop: true, frameInterval: 130 });
 
         petAvatarRoom.classList.add('pet-anim-walk');
 
