@@ -388,14 +388,17 @@
 
         .hotspot-new-dot {
             position: absolute;
-            top: 2px;
-            right: 2px;
-            width: 8px;
-            height: 8px;
+            top: 0;
+            right: 0;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: #ef4444;
+            border: 1.5px solid #fff;
+            box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.5);
             pointer-events: none;
             display: none;
+            z-index: 2;
         }
         .room-hotspot.show-cabinet-new-dot .hotspot-new-dot {
             display: block;
