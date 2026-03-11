@@ -1269,7 +1269,18 @@
                             <span>橱柜</span>
                         </div>
                     </button>
-                    <!-- 小锅热点已移除，锅在场景中仅作装饰，AI 仍可决策「去锅旁」 -->
+                    <!-- 小锅：靠近左下角大锅（精确位置由 JS HOTSPOT_POSITIONS_PCT.pot 控制） -->
+                    <button
+                        type="button"
+                        id="hotspot-pot"
+                        class="room-hotspot room-hotspot-highlight pointer-events-auto"
+                        aria-label="去小锅吃点东西"
+                    >
+                        <div class="room-hotspot-button">
+                            <span>🍲</span>
+                            <span>小锅</span>
+                        </div>
+                    </button>
                     <!-- 音乐盒：点击选择 BGM -->
                     <button
                         type="button"
