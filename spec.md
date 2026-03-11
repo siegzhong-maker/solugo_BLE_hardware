@@ -32,6 +32,8 @@
 *   **`呼吸演示.gif`** -> **IDLE_BREATH (idle_breath)**: 对应 `PET_STATES.IDLE_BREATH`，表现为轻微的身体起伏，用于默认待机状态。
 *   **`等待演示.gif`** -> **IDLE_WAIT (idle_wait)**: 对应 `PET_STATES.IDLE_WAIT`，表现为伸懒腰或四处张望，用于“让 AI 帮它想想”的思考期间或准备出发前。
 *   **`观察演示.gif`** -> **IDLE_OBSERVE (idle_observe)**: 对应 `PET_STATES.IDLE_OBSERVE`，表现为专注凝视某个方向，用于观察橱柜、门口等热点。
+*   **`吃演示.gif`** -> **EAT (eat)**: 吃食动作，可用于喂食等交互。
+*   **`摸演示.gif`** -> **PET/TOUCH (摸)**: 被抚摸时的反应动画。
 
 **注**：实际代码实现中，应调整 CSS Spritesheet 的播放逻辑（帧率、循环方式），以尽可能还原上述 GIF 的流畅度与神态。
 
