@@ -469,10 +469,10 @@ flowchart TD
 
 技术栈与接口设计详见 **第 9 章（Vercel AI SDK + 向量库）**。
 
-1. **第一阶段：无模型、本地规则 RAG**
-   - 先用简单规则和本地数据结构模拟 `PreferenceIndex` 与 `FurnitureThemeIndex`。
-   - `thinkingSteps` 与 `behaviorPlan` 可由规则模板生成。
-   - 同时接入第 9 章的写入（9.4）与检索（9.5），优先在日记生成链路使用检索，验证向量库与 AI SDK 流程。
+1. **第一阶段：最小可运行链路 + 规则 RAG**
+   - **先完成 9.8 最小可运行链路**：实现 `POST /api/embed-and-store` 与 `POST /api/retrieve`，用内存向量库 + Gemini embed，按 9.8.4 验收通过后再进行下一步。
+   - 再用简单规则和本地数据结构模拟 `PreferenceIndex` 与 `FurnitureThemeIndex`；`thinkingSteps` 与 `behaviorPlan` 可由规则模板生成。
+   - 将 9.8 与业务对接：在打卡后调用 `embed-and-store`，在日记生成前调用 `retrieve` 并把结果拼入 prompt（可选先仅日记链路），验证“真实检索”效果。
 
 2. **第二阶段：接入向量检索与模型**
    - 将 `PetMemoryEpisodic` / `PetMemorySemantic` 经 9.4 写入向量库；
@@ -490,6 +490,35 @@ flowchart TD
 ## 9. 技术实现：Vercel AI SDK + 向量库
 
 本节明确采用 **Vercel AI SDK** 与 **向量库** 实现第 2、3、6、8 章中的检索与增强生成，与现有 Vercel Serverless（`api/*.js`）和 OpenRouter 调用保持一致，无需新增运行时。**Embedding 与生成均选用 Google Gemini**：Embedding 使用 `@ai-sdk/google` 的 Gemini 嵌入模型，生成继续使用 OpenRouter 上的 Gemini（如 `google/gemini-2.0-flash-001`）。
+
+### 9.0 前置准备（第一次做 RAG/记忆时先完成这些）
+
+在写代码或接 API 之前，按下面顺序做完，后面 9.1–9.7 的实现才有地方“挂上去”。
+
+1. **账号与 API Key（必做）**
+   - **OpenRouter**：已有则跳过。没有则去 [OpenRouter](https://openrouter.ai/) 注册，在控制台创建 API Key，用于对话/日记/行为决策的**生成**。本地或 Vercel 里配置为 `OPENROUTER_API_KEY`（不要写进代码或提交到 Git）。
+   - **Google AI（Gemini）**：去 [Google AI Studio](https://aistudio.google.com/) 或 Google Cloud 创建项目并开通 Gemini API，拿到 API Key，用于 **Embedding**（把记忆和查询转成向量）。配置为 `GOOGLE_GENERATIVE_AI_API_KEY`，同样只放在环境变量里。
+
+2. **环境变量放在哪**
+   - **本地开发**：在项目根目录建 `.env.local`，写入上述两个 key；并确认 `.env.local` 在 `.gitignore` 里，避免误提交。
+   - **线上（Vercel）**：在 Vercel 项目 → Settings → Environment Variables 里添加 `OPENROUTER_API_KEY`、`GOOGLE_GENERATIVE_AI_API_KEY`，部署后生效。
+
+3. **向量库（三选一，先选一个就能开始）**
+   - **方案 A（推荐先做）**：**内存 / 不持久化**。不注册任何服务，在代码里用数组存 embedding + 原文，用 AI SDK 的 `cosineSimilarity` 做检索。用来先跑通“写入 → 检索 → 生成”全流程，再换持久化。
+   - **方案 B**：**Upstash Vector**。去 [Upstash](https://upstash.com/) 注册，创建一个 Vector 数据库，拿到 `UPSTASH_VECTOR_REST_URL` 和 `UPSTASH_VECTOR_REST_TOKEN`，填到环境变量。适合 Serverless、按用量计费。
+   - **方案 C**：**Postgres + pgvector**。已有或打算用 Postgres 时，给数据库启用 pgvector 扩展，建一张存 `(id, content, embedding, metadata)` 的表；环境变量里配置 `DATABASE_URL`。适合要和用户/日记等同库管理的场景。
+
+4. **项目里安装的依赖**
+   - 在 `soulgo` 项目里执行（示例）：
+     - `npm i ai @ai-sdk/google`
+     - 若选 Upstash Vector：再装 Upstash 的 Vector 客户端（如 `@upstash/vector`，以官方文档为准）。
+     - 若选 Postgres + pgvector：再装 `drizzle-orm`、`pg` 等（见 9.3）。
+   - 这样 9.4 / 9.5 里用到的 `embed`、`embedMany`、`cosineSimilarity` 和 Gemini 嵌入模型才有对应包。
+
+5. **先做最小可运行链路（推荐首步）**
+   - 不接打卡、日记、对话，只验证「embed → 存 → 查」是否通。具体范围与验收见 **9.8 节**。通过后再按 9.4、9.5 接入业务。
+
+**小结**：前置 = 两个 API Key（OpenRouter + Google）+ 环境变量配置 + 选一个向量存储方式（首步用内存即可）+ 装好 npm 包 + **先完成 9.8 最小可运行链路**。这些做完之后，再按 9.4–9.7 做完整写入/检索与业务对接。
 
 ### 9.1 选型说明
 
@@ -570,5 +599,66 @@ flowchart LR
   VDB --> Retrieve
 ```
 
-以上为基于 Vercel AI SDK + 向量库的完整技术规划，可直接用于实现“真正的 RAG”并与现有文档第 2–8 章保持一致。 
+以上为基于 Vercel AI SDK + 向量库的完整技术规划，可直接用于实现“真正的 RAG”并与现有文档第 2–8 章保持一致。
+
+### 9.8 最小可运行链路（推荐首步实施）
+
+在接入打卡、日记、对话之前，先实现并调通一条**不依赖业务**的最小 RAG 链路，用于验证环境、依赖与 API 形态。通过后再按 9.4、9.5 与现有流程衔接。
+
+#### 9.8.1 目标与范围
+
+- **目标**：确认「文本 → Gemini embed → 存储 → 查询 embed → top-k 检索」全链路可用，且无 Key、维度、环境变量错误。
+- **范围**：仅两个 Serverless 接口 + 内存向量库；不调用 `/api/memory-summary`、不接前端打卡/日记。
+- **向量存储**：使用**内存**（Node 模块内一个数组），Serverless 冷启动后为空，仅用于本机或单次会话验证；不持久化、不依赖 Upstash/Postgres。
+
+#### 9.8.2 接口约定
+
+**1. 写入：`POST /api/embed-and-store`**
+
+- **请求体**：`{ "summary": "一段记忆摘要，如：在武汉吃了热干面。", "key_facts": ["武汉", "热干面"], "location": "武汉", "date": "2026-03-01" }`（`key_facts`、`location`、`date` 可选）。
+- **后端逻辑**：将 `summary` 与 `key_facts` 拼成一段用于检索的文本（如「summary。关键词：key_facts.join('、')」）→ 使用 `embed`（Gemini）得到向量 → 将 `{ id, content, embedding, metadata }` 追加到内存数组（id 可用 nanoid 或时间戳）。
+- **响应**：`{ "ok": true, "id": "xxx" }` 或 `{ "error": "..." }`（如 Key 缺失、embed 失败）。
+
+**2. 检索：`POST /api/retrieve`**
+
+- **请求体**：`{ "query": "武汉 小吃", "topK": 3 }`（`topK` 默认 5）。
+- **后端逻辑**：使用 `embed`（Gemini）对 `query` 得到向量 → 对内存数组中每条用 `cosineSimilarity(queryEmbedding, item.embedding)` 算分 → 按分降序取 topK → 返回原文及可选 metadata。
+- **响应**：`{ "memories": [ { "content": "...", "metadata": { "location": "武汉", "date": "..." } }, ... ] }` 或 `{ "error": "..." }`。
+
+#### 9.8.3 实现要点（代码层面）
+
+- **共享内存**：两个 API 需访问同一份“向量数组”。在 Vercel Serverless 下，可将数组放在被两者都 `import` 的模块里（如 `lib/memory-vector-store.js`），注意同一实例内多请求共享、冷启动会清空。
+- **依赖**：仅需 `ai`、`@ai-sdk/google`；无需 Upstash/Postgres 依赖。环境变量只需 `GOOGLE_GENERATIVE_AI_API_KEY`（本阶段不需 `OPENROUTER_API_KEY`）。
+- **Gemini 模型名**：以当前 `@ai-sdk/google` 文档为准，例如 `google.textEmbeddingModel('text-embedding-004')` 或 `embedding-001`；若维度与文档不一致，需在写入与检索时保持一致。
+
+#### 9.8.4 验收步骤
+
+1. 启动本地 dev（如 `vercel dev` 或现有方式），确保 `GOOGLE_GENERATIVE_AI_API_KEY` 已配置。
+2. 调用写入：  
+   `curl -X POST http://localhost:3000/api/embed-and-store -H "Content-Type: application/json" -d '{"summary":"在厦门海边玩了沙子","key_facts":["厦门","海边"]}'`  
+   期望返回 `{ "ok": true, "id": "..." }`。
+3. 再写入 1～2 条不同内容（如武汉热干面、成都奶茶），便于区分检索结果。
+4. 调用检索：  
+   `curl -X POST http://localhost:3000/api/retrieve -H "Content-Type: application/json" -d '{"query":"海边 沙滩","topK":2}'`  
+   期望返回的 `memories` 中，与“海边”相关的排在前面。
+5. 换一个 query（如「武汉 小吃」）再检索，确认排序符合语义。
+
+**通过标准**：写入不报错、检索返回的 top-k 与 query 语义一致（无需接业务接口）。
+
+#### 9.8.5 通过后的下一步
+
+- 将 9.8 中的“内存数组”替换为 9.3 所选持久化方案（Upstash Vector 或 pgvector），或先保留内存，在打卡流程中接入：
+  - 在 `/api/memory-summary` 返回后由前端或后端再调一次 `/api/embed-and-store`；
+  - 在日记生成（或对话/行为决策）前调 `/api/retrieve` 或内联检索，把 `memories` 拼入 OpenRouter 的 prompt。
+- 此后按 9.4、9.5、9.6 完善写入时机、检索 query 构造与业务对接。
+
+#### 9.8.6 已实现文件清单
+
+最小可运行链路已实现，对应文件如下（验收前请配置 `GOOGLE_GENERATIVE_AI_API_KEY` 并执行 `npm install`）：
+
+- `package.json`：依赖 `ai`、`@ai-sdk/google`，`"type": "module"`。
+- `lib/memory-vector-store.js`：内存向量数组，提供 `add`、`query`（需传入 `cosineSimilarity` 函数）。
+- `api/embed-and-store.js`：`POST`，body `summary`、可选 `key_facts`/`location`/`date`；Gemini `gemini-embedding-001` embed 后写入内存；返回 `{ ok, id }`。
+- `api/retrieve.js`：`POST`，body `query`、可选 `topK`（默认 5）；embed query 后按余弦相似度取 top-k；返回 `{ memories: [{ content, metadata }] }`。
+- `.env.example`：环境变量示例（复制为 `.env.local` 并填写 Key，勿提交）。 
 

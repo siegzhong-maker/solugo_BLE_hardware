@@ -1,0 +1,17 @@
+{
+  "name": "soulgo",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "SoulGo travel diary AIGC + RAG (minimal runnable: embed-and-store, retrieve)",
+  "scripts": {
+    "local": "vercel dev"
+  },
+  "devDependencies": {
+    "vercel": "^39.0.0"
+  },
+  "dependencies": {
+    "ai": "^4.0.0",
+    "@ai-sdk/google": "^1.0.0"
+  }
+}
