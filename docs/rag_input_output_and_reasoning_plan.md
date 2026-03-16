@@ -467,18 +467,108 @@ flowchart TD
 
 ## 8. 实施建议
 
+技术栈与接口设计详见 **第 9 章（Vercel AI SDK + 向量库）**。
+
 1. **第一阶段：无模型、本地规则 RAG**
    - 先用简单规则和本地数据结构模拟 `PreferenceIndex` 与 `FurnitureThemeIndex`。
    - `thinkingSteps` 与 `behaviorPlan` 可由规则模板生成。
+   - 同时接入第 9 章的写入（9.4）与检索（9.5），优先在日记生成链路使用检索，验证向量库与 AI SDK 流程。
 
 2. **第二阶段：接入向量检索与模型**
-   - 将 `PetMemoryEpisodic` / `PetMemorySemantic` 存入向量库；
-   - 接入实际的文本生成模型（沿用 `gemini-3.0-flash`）；
-   - 让模型产出 `behaviorPlan` / `cabinetPlan` / `thinkingSteps`。
+   - 将 `PetMemoryEpisodic` / `PetMemorySemantic` 经 9.4 写入向量库；
+   - 接入实际的文本生成模型（沿用 OpenRouter / Gemini）；
+   - 日记、行为、对话均先检索（9.5）再调模型，让模型产出 `behaviorPlan` / `cabinetPlan` / `thinkingSteps`。
 
 3. **第三阶段：优化提示与可视化**
    - 根据埋点数据调优 Prompt 与展示节奏；
    - 增加更多风格化“思考过程”动效（例如光点在房间不同物件间跳跃）。
 
-通过以上设计，可以在不大改现有 UI/逻辑的前提下，引入一个以“性格 + 记忆 + 打卡点”为核心的 RAG 决策层，让宠物的行为和日记从“看起来有点随机”升级为“有理有据的陪伴感”。 
+通过以上设计，可以在不大改现有 UI/逻辑的前提下，引入一个以“性格 + 记忆 + 打卡点”为核心的 RAG 决策层，让宠物的行为和日记从“看起来有点随机”升级为“有理有据的陪伴感”。
+
+---
+
+## 9. 技术实现：Vercel AI SDK + 向量库
+
+本节明确采用 **Vercel AI SDK** 与 **向量库** 实现第 2、3、6、8 章中的检索与增强生成，与现有 Vercel Serverless（`api/*.js`）和 OpenRouter 调用保持一致，无需新增运行时。**Embedding 与生成均选用 Google Gemini**：Embedding 使用 `@ai-sdk/google` 的 Gemini 嵌入模型，生成继续使用 OpenRouter 上的 Gemini（如 `google/gemini-2.0-flash-001`）。
+
+### 9.1 选型说明
+
+- **Vercel AI SDK**：提供 `embed`、`embedMany`、`cosineSimilarity`，用于将情景记忆与查询转为向量并做相似度排序；可与 `generateText` / `streamText` 配合，将检索到的上下文注入 OpenRouter 的 prompt。参考：[AI SDK Embeddings](https://sdk.vercel.ai/docs/ai-sdk-core/embeddings)、[Node RAG 示例](https://sdk.vercel.ai/examples/node/generating-text/rag)、[RAG Chatbot 指南](https://sdk.vercel.ai/cookbook/guides/rag-chatbot)。
+- **Embedding 模型**：采用 **Google Gemini**（`@ai-sdk/google`），例如 `text-embedding-004` 或 `gemini-embedding-001`（维度以官方文档为准），中文与多语言支持良好。
+- **生成模型**：沿用现有 **OpenRouter + Gemini**（如 `google/gemini-2.0-flash-001`），用于日记、对话、行为决策。
+- **向量库**：负责持久化存储 embedding 与原文，并在查询时返回 top-k 相似文档。可选方案见 9.3。
+
+### 9.2 依赖与环境变量
+
+- **npm 依赖（示例）**
+  - `ai`：Vercel AI SDK 核心（`embed`、`embedMany`、`cosineSimilarity`、可选 `generateText`）。
+  - `@ai-sdk/google`：Google Gemini 提供方，用于 **Embedding**（如 `google.embeddingModel('text-embedding-004')` 或 `gemini-embedding-001`，以 SDK 文档为准）。
+  - 向量库客户端：见 9.3（Upstash 或 pgvector + Drizzle）。
+- **环境变量**
+  - 现有：`OPENROUTER_API_KEY`（对话/日记/行为决策的生成请求，不变）。
+  - 新增（Embedding）：`GOOGLE_GENERATIVE_AI_API_KEY`（Google AI Studio / Gemini API Key，仅用于 `@ai-sdk/google` 的 embed 调用；切勿写入代码或提交仓库，仅在 Vercel 环境变量或本地 `.env.local` 中配置）。
+  - 向量库：若用 Upstash Vector 则需 `UPSTASH_VECTOR_REST_URL`、`UPSTASH_VECTOR_REST_TOKEN`；若用 Postgres 则需 `DATABASE_URL`（且启用 pgvector 扩展）。
+
+### 9.3 向量库选型
+
+| 方案 | 适用场景 | 说明 |
+|------|----------|------|
+| **Upstash Vector** | Serverless、按请求计费、快速上线 | 与 Vercel 生态集成良好，无需自建数据库；[Upstash Vector + AI SDK](https://upstash.com/docs/vector/integrations/ai-sdk) 可直接用于 index/query。 |
+| **Postgres + pgvector + Drizzle** | 已有或计划使用 Postgres、需要与业务表同库 | 参考 [RAG Chatbot 指南](https://sdk.vercel.ai/cookbook/guides/rag-chatbot)：建 `embeddings` 表（含 `vector` 列、HNSW 索引），用 Drizzle 做插入与相似度查询。 |
+| **内存 / 单文件（仅开发）** | 本地或演示 | 使用 AI SDK 官方 RAG 示例中的 in-memory 数组 + `cosineSimilarity` 排序，不持久化，便于先跑通流程。 |
+
+建议：首阶段采用 **Upstash Vector** 或 **内存方案** 打通写入与检索；若后续需要与用户/日记等表同库管理，再迁至 **Postgres + pgvector**。
+
+### 9.4 写入流程（与 2.2 PetMemoryEpisodic 对应）
+
+- **触发时机**：每次打卡并成功调用 `/api/memory-summary` 得到 `summary`（及可选 `emotion`、`key_facts`）后，在写入前端 `appState.memories.episodic` 的同时，调用后端“写入向量”接口。
+- **数据单元（chunk）**：一条情景记忆对应一个 chunk。建议将 `summary` 与 `key_facts` 拼成一段短文（例如「summary。关键词：key_facts.join('、')」），便于语义检索；可选附带 `location`、`date` 等元数据用于过滤。
+- **后端实现要点**：
+  - 使用 `embed` 或 `embedMany`（Vercel AI SDK + `@ai-sdk/google` 的 Gemini 嵌入模型）对上述文本生成 embedding。
+  - 将 `{ content, embedding, metadata }` 写入所选向量库（Upstash index 或 pgvector 表）；若使用 Drizzle，需在 2.2 所述“原文 + 向量”的表中增加 `resourceId`/`diaryId` 等外键以便与 `DiaryEntry` 关联。
+- **API 形态**：新增例如 `POST /api/embed-and-store`，请求体包含 `summary`、`key_facts`、`diaryId`、`location`、`date` 等；接口内完成拼接 → embed → 写入向量库，返回成功或失败。
+
+### 9.5 检索流程（与 3.3 检索器对应）
+
+- **触发时机**：在以下场景中，在调用 OpenRouter（日记生成、对话、行为决策）之前先执行检索：
+  - **打卡后生成日记**：query = 当前打卡地点 + 用户备注 + 当前性格标签（如“小火苗”）。
+  - **房间内行为决策**（如 `/api/pet/decide`）：query = 当前状态描述 + 最近用户操作 + 性格关键词。
+  - **与宠物对话**（如 `/api/chat`）：query = 用户最后一句话 + 当前地点/性格。
+- **检索步骤**：
+  1. 使用 `embed({ model: google.embeddingModel('...'), value: query })`（Gemini 嵌入模型）得到查询向量。
+  2. 在向量库中做相似度搜索（Upstash 的 query 或 pgvector 的 orderBy 余弦距离），取 top-k（建议 k=3–5）。
+  3. 将得到的 `content`（及可选 metadata）整理为「相关记忆」列表，传入下游的上下文构建（3.2 节）。
+- **API 形态**：可单独提供 `POST /api/retrieve`（请求体 `{ query, topK }`，返回 `{ memories: [...] }`），也可在各业务接口（如日记生成、decide、chat）内部直接调用检索逻辑，再拼 context 调 OpenRouter。
+
+### 9.6 与现有流程的衔接
+
+- **与 6.2 日记生成**：在触发日记生成前，用 9.5 的 query 调用检索 → 将 `memories` 填入 4.1 节的 `episodicMemories`（或 `recentMemories`）→ 再调用现有 OpenRouter 接口；思考过程（5.x）中“参考了 N 条旅行记忆”的 N 与来源可改为真实检索结果。
+- **与 6.1 行为引擎**：在 `/api/pet/decide` 中，先检索再构建 prompt，把“相关记忆”作为上下文传入，模型返回的 `reason` 可继续驱动前端思考区展示。
+- **与 5.x 思考过程 UI**：无需改 UI 结构；仅保证“准备阶段”对应检索请求，“思考阶段”的文案来自模型基于检索结果的输出。
+- **与 8. 实施建议**：  
+  - **第一阶段**：仍可用规则模拟 `thinkingSteps` / `behaviorPlan`，但同时接入 9.4 写入与 9.5 检索（例如仅日记生成使用检索），验证向量库与 AI SDK 链路。  
+  - **第二阶段**：将 `PetMemoryEpisodic` 全部经 9.4 写入向量库；日记、行为、对话均先检索再调模型。  
+  - **第三阶段**：视需要增加 `PreferenceIndex`、`FurnitureThemeIndex`（可复用同一向量库的 namespace 或表，用 metadata 区分类型）。
+
+### 9.7 数据流小结
+
+```mermaid
+flowchart LR
+  subgraph write["写入"]
+    MS["/api/memory-summary"] --> ES["/api/embed-and-store"]
+    ES --> Embed["embed()"]
+    Embed --> VDB["向量库"]
+  end
+  subgraph read["检索与生成"]
+    Trigger["打卡/对话/行为"] --> Q["query 拼接"]
+    Q --> R["embed(query)"]
+    R --> Retrieve["向量库 top-k"]
+    Retrieve --> Ctx["拼入 context"]
+    Ctx --> OR["OpenRouter"]
+    OR --> UI["思考区 + 日记/行为"]
+  end
+  VDB --> Retrieve
+```
+
+以上为基于 Vercel AI SDK + 向量库的完整技术规划，可直接用于实现“真正的 RAG”并与现有文档第 2–8 章保持一致。 
 
