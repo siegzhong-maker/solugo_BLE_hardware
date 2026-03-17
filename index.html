@@ -6569,17 +6569,58 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                 '</div>'
             : '';
 
-        const identityBlock = (profile && (profile.identity || (profile.preferences && Object.keys(profile.preferences).length > 0))) ? `
-            <div class="memory-card bg-white rounded-xl p-3 shadow-md border border-gray-100 text-left relative mb-2" data-memory-type="semanticProfile">
-                <div class="absolute top-2 left-2 text-[#ff9a9e]"><i class="ph-fill ph-paperclip-tilt text-sm"></i></div>
-                <button type="button" class="memory-edit-btn absolute top-2 right-2 text-[10px] text-gray-500 hover:text-[#ff8fab] px-1.5 py-0.5 rounded">编辑</button>
-                <div class="text-[10px] text-gray-400 mb-1">人格设定</div>
-                ${profile.identity ? '<div class="text-xs text-gray-700 mb-2">' + escapeHtml(profile.identity) + '</div>' : ''}
-                ${(profile.preferences && (profile.preferences.food || profile.preferences.dislikes || profile.preferences.abilities)) ? '<div class="text-[11px] text-gray-600 space-y-1">' + (profile.preferences.food ? '<div>喜好：' + escapeHtml(profile.preferences.food) + '</div>' : '') + (profile.preferences.dislikes ? '<div>不喜欢：' + escapeHtml(profile.preferences.dislikes) + '</div>' : '') + (profile.preferences.abilities ? '<div>能力：' + escapeHtml(profile.preferences.abilities) + '</div>' : '') + '</div>' : ''}
-                ${(profile.speaking_style && profile.speaking_style.description) ? '<div class="text-[11px] text-gray-500 mt-2 border-t border-gray-100 pt-1.5">' + escapeHtml(profile.speaking_style.description) + '</div>' : ''}
-                ${(profile.call_user && profile.call_user.length) ? '<div class="text-[10px] text-gray-400 mt-1">称呼你：' + escapeHtml(profile.call_user.join('、')) + '</div>' : ''}
-            </div>
-        ` : '';
+        function truncateText(text, maxLength) {
+            const str = (text || '').trim();
+            if (!str) return '';
+            if (str.length <= maxLength) return str;
+            return str.slice(0, maxLength) + '…';
+        }
+
+        function createPreferenceTags(profile) {
+            if (!profile || !profile.preferences) return '';
+            const prefs = profile.preferences || {};
+            const tags = [];
+            if (prefs.food) tags.push(prefs.food);
+            if (prefs.dislikes) tags.push(prefs.dislikes);
+            if (prefs.abilities) tags.push(prefs.abilities);
+            if (!tags.length) return '';
+            const sliced = tags.slice(0, 3);
+            return sliced.map((t) =>
+                '<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-100 text-[10px] mr-1 mb-1">' +
+                escapeHtml(truncateText(t, 10)) +
+                '</span>'
+            ).join('');
+        }
+
+        function buildSemanticProfileSummaryCard(profile) {
+            if (!profile || (!profile.identity && !(profile.preferences && Object.keys(profile.preferences).length > 0))) return '';
+            const title = truncateText(profile.identity || '还没有用一句话介绍 TA', 18);
+            const prefsTagsHTML = createPreferenceTags(profile);
+            const callUser = Array.isArray(profile.call_user) ? profile.call_user.filter(Boolean) : [];
+            const statsLineParts = [];
+            if (prefsTagsHTML) {
+                const prefCount = ['food', 'dislikes', 'abilities'].filter((k) => profile.preferences && profile.preferences[k]).length;
+                if (prefCount) statsLineParts.push(prefCount + ' 个偏好');
+            }
+            if (callUser.length) {
+                statsLineParts.push(callUser.length + ' 个称呼');
+            }
+            const statsLine = statsLineParts.join(' · ');
+            return `
+                <div class="memory-card bg-white rounded-xl p-3 shadow-md border border-gray-100 text-left relative mb-2 cursor-pointer" data-memory-type="semanticProfile">
+                    <div class="absolute top-2 left-2 text-[#ff9a9e]"><i class="ph-fill ph-user text-sm"></i></div>
+                    <button type="button" class="memory-edit-btn absolute top-2 right-2 text-[10px] text-gray-500 hover:text-[#ff8fab] px-1.5 py-0.5 rounded">编辑</button>
+                    <div class="text-[10px] text-gray-400 mb-1">人格设定</div>
+                    <div class="flex items-center justify-between gap-2 mb-1">
+                        <div class="text-xs font-semibold text-gray-800 leading-snug">${escapeHtml(title)}</div>
+                        ${statsLine ? '<div class="text-[10px] text-gray-400 shrink-0">' + escapeHtml(statsLine) + '</div>' : ''}
+                    </div>
+                    ${prefsTagsHTML ? '<div class="mt-1 -mr-1 flex flex-wrap">' + prefsTagsHTML + '</div>' : ''}
+                </div>
+            `;
+        }
+
+        const identityBlock = buildSemanticProfileSummaryCard(profile);
 
         // 互动习惯可视化：Top actions 横向条
         let interactionVisualHTML = '';
@@ -6626,9 +6667,33 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
                 '</div>';
         }
 
-        const habitCardsHTML = (currentMemoryTab === 'character' && habits.length > 0) ? habits.map((h, idx) =>
-            '<div class="memory-card bg-white rounded-xl p-3 shadow-md border border-gray-100 text-left relative" data-memory-type="habit" data-habit-index="' + idx + '"><button type="button" class="memory-edit-btn absolute top-2 right-2 text-[10px] text-gray-500 hover:text-[#ff8fab] px-1.5 py-0.5 rounded">编辑</button>' + (h.generated_at ? '<div class="text-[10px] text-gray-400 mb-1">' + escapeHtml(h.generated_at) + '</div>' : '') + '<div class="text-xs text-gray-700 leading-relaxed">' + escapeHtml(h.summary || '') + '</div></div>'
-        ).join('') : '';
+        function buildHabitSummaryCard(habit, idx) {
+            if (!habit) return '';
+            const isInteraction = habit.type === 'interaction';
+            const rawSummary = habit.summary || '';
+            const summary = truncateText(rawSummary, 12);
+            const dateStr = (habit.timestamp || habit.generated_at) ? (function () {
+                const d = new Date(habit.timestamp || habit.generated_at);
+                if (isNaN(d.getTime())) return String(habit.timestamp || habit.generated_at).slice(0, 10);
+                return d.toLocaleDateString ? d.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }) : String(habit.timestamp || habit.generated_at).slice(0, 10);
+            }()) : '';
+            const labelPrefix = isInteraction ? '' : '经常… ';
+            return (
+                '<button type="button" class="habit-summary-card rounded-lg border bg-white p-2.5 shadow-sm flex flex-col items-start text-left relative hover:bg-teal-50/60 transition cursor-pointer" data-memory-type="habit" data-habit-index="' + idx + '">' +
+                '<div class="flex items-center gap-1 mb-1 text-[11px] text-gray-700">' +
+                '<i class="ph-fill ph-footprints text-amber-500 text-xs"></i>' +
+                '<span class="font-medium">' + escapeHtml(truncateText(labelPrefix + summary, 14)) + '</span>' +
+                '</div>' +
+                (dateStr ? '<div class="text-[10px] text-gray-400">' + escapeHtml(dateStr) + '</div>' : '') +
+                '</button>'
+            );
+        }
+
+        const habitCardsHTML = (currentMemoryTab === 'character' && habits.length > 0)
+            ? '<div class="mt-2"><div class="flex items-center justify-between mb-1"><div class="flex items-center gap-1 text-[11px] font-semibold text-gray-500"><i class="ph-fill ph-footprints text-amber-500 text-xs"></i><span>小习惯碎片</span></div><span class="text-[10px] text-gray-400">共 ' + habits.length + ' 条</span></div><div class="grid grid-cols-2 md:grid-cols-3 gap-2">' +
+                habits.map((h, idx) => buildHabitSummaryCard(h, idx)).join('') +
+                '</div></div>'
+            : '';
 
         const characterEmptyHTML = (currentMemoryTab === 'character' && !(profile && profile.identity) && habits.length === 0) ? '<div class="flex flex-col items-center justify-center text-center text-xs text-gray-500 py-4 gap-2"><p>我还没有记下这类呢。</p></div>' : '';
 
@@ -6765,14 +6830,34 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
         } else if (type === 'semanticProfile' && appState.memories && appState.memories.semanticProfile) {
             const p = appState.memories.semanticProfile;
             formHTML = `
-                <div class="flex flex-col gap-2 text-xs">
-                    <label>身份（我…） <textarea id="edit-semantic-identity" class="w-full border rounded px-2 py-1 h-16">${escapeHtml(p.identity || '')}</textarea></label>
-                    <label>喜好（食物等） <input type="text" id="edit-semantic-food" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.food) || '')}"></label>
-                    <label>不喜欢 <input type="text" id="edit-semantic-dislikes" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.dislikes) || '')}"></label>
-                    <label>能力 <input type="text" id="edit-semantic-abilities" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.abilities) || '')}"></label>
-                    <label>说话风格描述 <input type="text" id="edit-semantic-desc" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.speaking_style && p.speaking_style.description) || '')}"></label>
-                    <label>称呼你（逗号分隔） <input type="text" id="edit-semantic-call" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.call_user && p.call_user.join) ? p.call_user.join('、') : '')}" placeholder="${escapeHtml(ownerTitle)}"></label>
-                    <div class="flex gap-2 mt-2">
+                <div class="flex flex-col gap-3 text-xs">
+                    <div class="space-y-1">
+                        <div class="text-[10px] text-gray-400">先用一句话，给 TA 一个小小的身份介绍</div>
+                        <label>身份（一句话就好） <textarea id="edit-semantic-identity" class="w-full border rounded px-2 py-1 h-16" placeholder="我是一只…">${escapeHtml(p.identity || '')}</textarea></label>
+                    </div>
+                    <div class="grid grid-cols-1 gap-2">
+                        <div class="space-y-1">
+                            <div class="text-[10px] text-gray-400">TA 特别喜欢什么，可以是食物、地方或小习惯</div>
+                            <label>喜好 <input type="text" id="edit-semantic-food" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.food) || '')}" placeholder="爱吃甜的 / 喜欢安静角落"></label>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-[10px] text-gray-400">有什么是 TA 不太喜欢、想要避开的</div>
+                            <label>不太喜欢 <input type="text" id="edit-semantic-dislikes" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.dislikes) || '')}" placeholder="讨厌吵闹 / 不爱早起"></label>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-[10px] text-gray-400">TA 擅长的小能力，也可以只是你觉得很可爱的点</div>
+                            <label>小能力 <input type="text" id="edit-semantic-abilities" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.preferences && p.preferences.abilities) || '')}" placeholder="很会陪聊 / 记性很好"></label>
+                        </div>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-[10px] text-gray-400">说话的感觉，可以简单丢几个形容词</div>
+                        <label>说话风格 <input type="text" id="edit-semantic-desc" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.speaking_style && p.speaking_style.description) || '')}" placeholder="慢悠悠 / 碎碎念 / 很元气"></label>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-[10px] text-gray-400">TA 会怎么叫你？可以写几个称呼，用逗号或顿号分开</div>
+                        <label>称呼你 <input type="text" id="edit-semantic-call" class="w-full border rounded px-2 py-1" value="${escapeHtml((p.call_user && p.call_user.join) ? p.call_user.join('、') : '')}" placeholder="${escapeHtml(ownerTitle)}"></label>
+                    </div>
+                    <div class="flex gap-2 mt-1">
                         <button type="button" id="memory-edit-save" class="px-3 py-1.5 bg-[#ff8fab] text-white rounded font-bold">保存</button>
                         <button type="button" id="memory-edit-cancel" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded">取消</button>
                     </div>
@@ -6799,10 +6884,16 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
         } else if (type === 'habit' && index >= 0 && appState.memories && appState.memories.habit && appState.memories.habit[index]) {
             const h = appState.memories.habit[index];
             formHTML = `
-                <div class="flex flex-col gap-2 text-xs">
-                    <label>总结（宠物视角） <textarea id="edit-habit-summary" class="w-full border rounded px-2 py-1 h-24">${escapeHtml(h.summary || '')}</textarea></label>
-                    <label>生成时间 <input type="text" id="edit-habit-date" class="w-full border rounded px-2 py-1" value="${escapeHtml(h.generated_at || '')}" placeholder="YYYY-MM-DD"></label>
-                    <div class="flex gap-2 mt-2">
+                <div class="flex flex-col gap-3 text-xs">
+                    <div class="space-y-1">
+                        <div class="text-[10px] text-gray-400">这一小习惯，记录成一句话就好</div>
+                        <label>习惯关键词/一句话 <textarea id="edit-habit-summary" class="w-full border rounded px-2 py-1 h-20" placeholder="经常… / 你总会…">${escapeHtml(h.summary || '')}</textarea></label>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="text-[10px] text-gray-400">大概是什么时候发现的也可以写下</div>
+                        <label>发现时间（可选） <input type="text" id="edit-habit-date" class="w-full border rounded px-2 py-1" value="${escapeHtml(h.generated_at || '')}" placeholder="YYYY-MM-DD"></label>
+                    </div>
+                    <div class="flex gap-2 mt-1">
                         <button type="button" id="memory-edit-save" class="px-3 py-1.5 bg-[#ff8fab] text-white rounded font-bold">保存</button>
                         <button type="button" id="memory-edit-cancel" class="px-3 py-1.5 bg-gray-200 text-gray-700 rounded">取消</button>
                     </div>
