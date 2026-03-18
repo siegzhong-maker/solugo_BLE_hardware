@@ -8,6 +8,22 @@
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap');
+
+        :root {
+            /* UI.psd 色系（用 UI界面稿近似抽色）：奶油纸、薄荷绿、主题粉 */
+            --ui-paper: #fbf3dd;
+            --ui-paper-2: #fffaf0;
+            --ui-ink: #3b3b3b;
+            --ui-muted: #6b7280;
+            --ui-mint: #cddccf;      /* UI界面1-3 */
+            --ui-mint-2: #e6f1e8;
+            --ui-accent: #ff86a5;    /* UI界面2-1 */
+            --ui-accent-hover: #ff6f94;
+            --ui-border: #e6dcc4;
+            --ui-border-strong: #d6c8aa;
+            --ui-shadow: rgba(120, 90, 60, 0.18);
+            --ui-shadow-soft: rgba(120, 90, 60, 0.10);
+        }
         
         body {
             background-color: #f0f4f8; 
@@ -219,13 +235,41 @@
         }
         .pin-drop { animation: dropPin 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
-        /* 地图容器：北—南渐变底色区分 */
+        /* 地图控件（打卡地图）皮肤：替换为 UI 纸张+薄荷色系 */
+        #view-home {
+            background-color: var(--ui-paper-2) !important;
+        }
+
+        /* 地图容器：替换原北-南渐变为“纸张+薄荷”柔和底色 */
         #china-map-container {
-            background: linear-gradient(to bottom,
-                #e8f4fc 0%,
-                #f0f9ff 35%,
-                #f5fcf9 70%,
-                #fefce8 100%);
+            background: radial-gradient(120% 90% at 50% 10%,
+                    rgba(255, 255, 255, 0.95) 0%,
+                    var(--ui-mint-2) 38%,
+                    var(--ui-paper) 100%) !important;
+            border-color: var(--ui-border) !important;
+            box-shadow: 0 10px 26px var(--ui-shadow-soft) !important;
+        }
+
+        /* 地图输入框与按钮：统一主题粉与纸张边框 */
+        #location-input {
+            border-color: transparent !important;
+            box-shadow: 0 2px 10px rgba(120, 90, 60, 0.06) !important;
+        }
+        #location-input:focus {
+            border-color: var(--ui-accent) !important;
+            box-shadow: 0 0 0 3px rgba(255, 134, 165, 0.18), 0 2px 10px rgba(120, 90, 60, 0.06) !important;
+        }
+
+        #btn-checkin {
+            background-color: var(--ui-accent) !important;
+            box-shadow: 0 8px 14px rgba(255, 134, 165, 0.22), 0 6px 16px rgba(120, 90, 60, 0.10) !important;
+        }
+        #btn-checkin:hover {
+            background-color: var(--ui-accent-hover) !important;
+        }
+        #btn-checkin:disabled {
+            background-color: rgba(255, 134, 165, 0.60) !important;
+            box-shadow: 0 6px 12px rgba(120, 90, 60, 0.08) !important;
         }
 
         /* 地图省份热点：动漫风可点击区域，默认不显示避免像常驻图钉 */
@@ -245,7 +289,7 @@
         .map-hotspot:hover,
         .map-hotspot:focus {
             opacity: 1;
-            background: rgba(255, 143, 171, 0.4);
+            background: rgba(255, 134, 165, 0.32);
             transform: translate(-50%, -50%) scale(1.15);
         }
         .map-hotspot:active {
