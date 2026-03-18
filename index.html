@@ -1360,7 +1360,9 @@
         <div id="modal-panel" class="bg-[#fffaf0] rounded-3xl w-[90%] max-h-[75%] p-4 flex flex-col shadow-2xl">
             <div class="flex items-center justify-between mb-3">
                 <h2 id="modal-title" class="text-sm font-bold text-gray-800"></h2>
-                <button id="modal-close" class="text-gray-400 hover:text-gray-600 text-xl leading-none" data-modal-close aria-label="关闭">&times;</button>
+                <button id="modal-close" class="w-8 h-8 flex items-center justify-center transition-transform active:scale-90" data-modal-close aria-label="关闭">
+                    <img src="assets/UI/UI界面1-2.png" alt="Close" class="w-full h-full object-contain">
+                </button>
             </div>
             <div id="modal-body" class="relative flex-1 overflow-y-auto no-scrollbar space-y-3 text-xs min-h-0"></div>
         </div>
@@ -7567,29 +7569,31 @@ summary 30～50 字，第一人称，描述宠物在该地的具体表现或感�
             const scene = m.scene || (typeof getSceneAsset === 'function' ? getSceneAsset(location) : null);
             const text = (m.narration || m.text || m.summary || '').trim() || '';
 
-            const sceneImageBlock = scene && scene.image
-                ? `<img src="${scene.image}" alt="${escapeHtml(scene.label || '')}" class="w-16 h-16 rounded-xl object-cover border border-white shadow-sm mb-2">`
-                : '';
+            const sceneImageBlock = `
+            <div class="relative w-16 h-16 mb-2 flex-shrink-0">
+                <img src="assets/UI/UI界面1-3.png" alt="Location Map" class="w-full h-full rounded-xl object-cover border border-[#8d6e63] shadow-sm">
+                ${scene && scene.image ? `<img src="${scene.image}" alt="${escapeHtml(scene.label || '')}" class="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg border border-white shadow-md object-cover bg-white">` : ''}
+            </div>`;
 
             const diaryHTML = `
-            <div class="glass-card rounded-2xl p-4 transform transition-all hover:scale-[1.01] shadow-sm animate-[fadeIn_0.5s_ease-out]" data-diary-id="${escapeHtml(diaryId)}">
-                <div class="flex justify-between items-center mb-2">
-                    <span class="text-xs font-bold text-white bg-[#cdb4db] px-2 py-1 rounded-md">${escapeHtml(date)}</span>
-                    <span class="text-xs text-gray-500 font-bold"><i class="ph-fill ph-map-pin text-[#ff8fab]"></i> ${escapeHtml(location)}</span>
+            <div class="rounded-2xl p-6 transform transition-all hover:scale-[1.01] shadow-md animate-[fadeIn_0.5s_ease-out] bg-[url('assets/UI/UI界面1-1.png')] bg-cover bg-center text-[#5d4037]" data-diary-id="${escapeHtml(diaryId)}" style="min-height: 140px;">
+                <div class="flex justify-between items-center mb-3 border-b border-[#8d6e63]/20 pb-2">
+                    <span class="text-xs font-bold text-[#5d4037] bg-[#fffaf0]/80 px-2 py-1 rounded-md border border-[#8d6e63]/30">${escapeHtml(date)}</span>
+                    <span class="text-xs text-[#5d4037] font-bold flex items-center gap-1"><i class="ph-fill ph-map-pin text-[#d84315]"></i> ${escapeHtml(location)}</span>
                 </div>
-                <div class="flex gap-3">
+                <div class="flex gap-4">
                     <div class="flex flex-col items-center">
                         ${sceneImageBlock}
-                        <div class="text-3xl bg-white rounded-xl p-2 h-fit shadow-inner">${avatar}</div>
+                        <div class="text-2xl bg-[#fffaf0]/90 rounded-full p-1.5 h-fit shadow-sm border border-[#8d6e63]/30 mt-1">${avatar}</div>
                     </div>
                     <div class="flex-1 flex flex-col gap-2">
-                        <p class="text-gray-700 text-sm leading-relaxed">${escapeHtml(text)}</p>
-                        <div id="diary-aigc-${escapeHtml(diaryId)}" class="diary-aigc-image mt-2 hidden rounded-lg overflow-hidden relative min-h-[150px] bg-gray-50 flex items-center justify-center" data-diary-id="${escapeHtml(diaryId)}">
+                        <p class="text-[#5d4037] text-sm leading-relaxed font-medium" style="text-shadow: 0 1px 0 rgba(255,255,255,0.5);">${escapeHtml(text)}</p>
+                        <div id="diary-aigc-${escapeHtml(diaryId)}" class="diary-aigc-image mt-2 hidden rounded-lg overflow-hidden relative min-h-[150px] bg-[#8d6e63]/10 flex items-center justify-center" data-diary-id="${escapeHtml(diaryId)}">
                         </div>
                         <div class="diary-images mt-1 flex gap-2 flex-wrap"></div>
                         <button
                             type="button"
-                            class="diary-add-image inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/80 border border-dashed border-gray-300 text-[11px] text-gray-600 hover:border-[#ff8fab] hover:text-[#ff8fab] transition-colors"
+                            class="diary-add-image inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#fffaf0]/60 border border-dashed border-[#8d6e63]/50 text-[11px] text-[#5d4037] hover:bg-[#fffaf0] hover:border-[#d84315] transition-colors self-start mt-2"
                             data-diary-id="${escapeHtml(diaryId)}"
                         >
                             <i class="ph-fill ph-camera"></i>
