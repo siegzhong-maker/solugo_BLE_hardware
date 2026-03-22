@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ESP32-C3 模拟器控制面板</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    h1 { text-align: center; margin-bottom: 10px; font-size: 24px; }
+    .subtitle { text-align: center; color: #888; margin-bottom: 30px; font-size: 14px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      padding: 20px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    h2 { font-size: 16px; color: #667eea; margin-bottom: 20px; }
+    .control {
+      margin-bottom: 15px;
+    }
+    label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+    .value { color: #00d2ff; font-weight: bold; }
+    input[type="range"] {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 3px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      background: #667eea;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    input[type="number"], input[type="text"], select {
+      width: 100%;
+      padding: 8px;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #fff;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:active { transform: scale(0.98); }
+    .status {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      border-radius: 12px;
+      min-width: 200px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #dc3545; }
+    .dot.active { background: #28a745; box-shadow: 0 0 10px #28a745; }
+    .led-box {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #28a745;
+      box-shadow: 0 0 10px #28a745;
+    }
+  </style>
+</head>
+<body>
+  <h1>🛠️ ESP32-C3 硬件模拟器</h1>
+  <div class="subtitle">调节参数 → 云端页面通过蓝牙读取 → 实时同步</div>
+
+  <div class="grid">
+    <!-- GPS 坐标 -->
+    <div class="card">
+      <h2>📍 GPS 坐标</h2>
+      <div class="control">
+        <label>纬度 <span class="value" id="valLat">31.245120</span></label>
+        <input type="range" min="0" max="90" step="0.000001" value="31.245120" id="inputLat">
+      </div>
+      <div class="control">
+        <label>经度 <span class="value" id="valLon">121.482350</span></label>
+        <input type="range" min="0" max="180" step="0.000001" value="121.482350" id="inputLon">
+      </div>
+      <div class="row">
+        <div class="control">
+          <label>海拔(m)</label>
+          <input type="number" value="15" id="inputAlt">
+        </div>
+        <div class="control">
+          <label>速度(km/h)</label>
+          <input type="number" value="0.5" step="0.1" id="inputSpeed">
+        </div>
+      </div>
+    </div>
+
+    <!-- GPS 诊断 -->
+    <div class="card">
+      <h2>🔬 GPS 诊断</h2>
+      <div class="control">
+        <label>天线状态</label>
+        <select id="inputAntenna">
+          <option value="OK" selected>OK (正常)</option>
+          <option value="OPEN">OPEN (断开)</option>
+          <option value="SHORT">SHORT (短路)</option>
+          <option value="UNKNOWN">UNKNOWN (未知)</option>
+        </select>
+      </div>
+      <div class="row">
+        <div class="control">
+          <label>可见 GPS 卫星</label>
+          <input type="number" value="12" id="inputSatGP">
+        </div>
+        <div class="control">
+          <label>可见北斗卫星</label>
+          <input type="number" value="6" id="inputSatBD">
+        </div>
+      </div>
+      <div class="control">
+        <label>定位类型</label>
+        <select id="inputFixType">
+          <option value="1">1 - 无定位</option>
+          <option value="2">2 - 2D定位</option>
+          <option value="3" selected>3 - 3D定位</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 电池 -->
+    <div class="card">
+      <h2>🔋 电池状态</h2>
+      <div class="control">
+        <label>电压(V) <span class="value" id="valVolt">3.85</span></label>
+        <input type="range" min="3.0" max="4.2" step="0.01" value="3.85" id="inputVolt">
+      </div>
+      <div class="control">
+        <label>电量(%) <span class="value" id="valPercent">85%</span></label>
+        <input type="range" min="0" max="100" value="85" id="inputPercent">
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
+        <input type="checkbox" id="inputCharging"> 充电中
+      </label>
+    </div>
+
+    <!-- NFC -->
+    <div class="card">
+      <h2>📶 NFC 模拟</h2>
+      <div class="control">
+        <label>卡片 UID (十六进制)</label>
+        <input type="text" value="A1B2C3D4" id="inputUID" maxlength="8">
+      </div>
+      <div class="control">
+        <label>卡片类型</label>
+        <select id="inputCardType">
+          <option value="MIFARE_1K" selected>MIFARE 1K</option>
+          <option value="MIFARE_UL">MIFARE Ultralight</option>
+          <option value="MIFARE_4K">MIFARE 4K</option>
+        </select>
+      </div>
+      <button onclick="triggerNFC()">🎯 立即触发刷卡事件</button>
+    </div>
+
+    <!-- 加速度计 -->
+    <div class="card">
+      <h2>📊 加速度计</h2>
+      <div class="control">
+        <label>X 轴(g) <span class="value" id="valX">0.12</span></label>
+        <input type="range" min="-200" max="200" value="12" id="inputX">
+      </div>
+      <div class="control">
+        <label>Y 轴(g) <span class="value" id="valY">-0.05</span></label>
+        <input type="range" min="-200" max="200" value="-5" id="inputY">
+      </div>
+      <div class="control">
+        <label>Z 轴(g) <span class="value" id="valZ">0.98</span></label>
+        <input type="range" min="-200" max="200" value="98" id="inputZ">
+      </div>
+    </div>
+
+    <!-- 手动操作 -->
+    <div class="card">
+      <h2>🎮 手动触发</h2>
+      <button onclick="forceDiag()">📡 立即发送 GPS 诊断</button>
+      <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div style="font-size: 12px; color: #888; margin-bottom: 10px;">
+          当前状态：<span id="connStatus">等待云端连接...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 状态栏 -->
+  <div class="status">
+    <div class="status-item">
+      <div class="dot" id="wsDot"></div>
+      <span>控制面板连接</span>
+    </div>
+    <div class="status-item">
+      <div class="dot" id="bleDot"></div>
+      <span>云端页面(BLE)</span>
+    </div>
+    <div class="status-item">
+      <span>LED:</span>
+      <div class="led-box" id="ledBox" style="background: #28a745;"></div>
+      <span id="ledText">待机</span>
+    </div>
+  </div>
+
+  <script>
+    const ws = new WebSocket(`ws://${window.location.host}`);
+    
+    ws.onopen = () => {
+      document.getElementById('wsDot').classList.add('active');
+      console.log('已连接到模拟器');
+    };
+    
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      
+      if (msg.type === 'init') {
+        console.log('初始状态:', msg.hardware);
+      }
+      
+      if (msg.type === 'cmd_received') {
+        // 显示云端发送了什么指令过来
+        document.getElementById('connStatus').textContent = `收到: ${msg.cmd}`;
+        setTimeout(() => document.getElementById('connStatus').textContent = '云端已连接', 2000);
+      }
+      
+      if (msg.type === 'vibration') {
+        document.getElementById('ledBox').style.background = '#dc3545';
+        document.getElementById('ledText').textContent = `震动(${msg.name})`;
+      }
+      
+      if (msg.type === 'vibration_end') {
+        document.getElementById('ledBox').style.background = '#00d2ff';
+        document.getElementById('ledText').textContent = '已连接';
+      }
+    };
+    
+    // 发送更新到服务器
+    function update(section, data) {
+      ws.send(JSON.stringify({ type: 'update', section, data }));
+    }
+    
+    // GPS
+    document.getElementById('inputLat').addEventListener('input', (e) => {
+      document.getElementById('valLat').textContent = parseFloat(e.target.value).toFixed(6);
+      update('gps', { lat: parseFloat(e.target.value), timeObj: true });
+    });
+    document.getElementById('inputLon').addEventListener('input', (e) => {
+      document.getElementById('valLon').textContent = parseFloat(e.target.value).toFixed(6);
+      update('gps', { lon: parseFloat(e.target.value) });
+    });
+    ['inputAlt', 'inputSpeed'].forEach(id => {
+      document.getElementById(id).addEventListener('change', (e) => {
+        const key = id === 'inputAlt' ? 'alt' : 'speed';
+        update('gps', { [key]: parseFloat(e.target.value) });
+      });
+    });
+    
+    // 诊断
+    document.getElementById('inputAntenna').addEventListener('change', (e) => {
+      update('gpsDiag', { antenna: e.target.value });
+    });
+    document.getElementById('inputSatGP').addEventListener('change', (e) => {
+      update('gpsDiag', { satGP: parseInt(e.target.value), satTot: parseInt(e.target.value) + hardware.gpsDiag.satBD });
+    });
+    document.getElementById('inputSatBD').addEventListener('change', (e) => {
+      update('gpsDiag', { satBD: parseInt(e.target.value), satTot: hardware.gpsDiag.satGP + parseInt(e.target.value) });
+    });
+    document.getElementById('inputFixType').addEventListener('change', (e) => {
+      update('gpsDiag', { fixType: parseInt(e.target.value) });
+    });
+    
+    // 电池
+    document.getElementById('inputVolt').addEventListener('input', (e) => {
+      document.getElementById('valVolt').textContent = e.target.value;
+      update('battery', { voltage: parseFloat(e.target.value) });
+    });
+    document.getElementById('inputPercent').addEventListener('input', (e) => {
+      document.getElementById('valPercent').textContent = e.target.value + '%';
+      update('battery', { percent: parseInt(e.target.value) });
+    });
+    document.getElementById('inputCharging').addEventListener('change', (e) => {
+      update('battery', { charging: e.target.checked });
+    });
+    
+    // 加速度
+    ['inputX', 'inputY', 'inputZ'].forEach((id, idx) => {
+      document.getElementById(id).addEventListener('input', (e) => {
+        const val = parseInt(e.target.value) / 100;
+        const labels = ['valX', 'valY', 'valZ'];
+        const keys = ['x', 'y', 'z'];
+        document.getElementById(labels[idx]).textContent = val.toFixed(2);
+        update('accel', { [keys[idx]]: val });
+      });
+    });
+    
+    // NFC
+    function triggerNFC() {
+      const uid = document.getElementById('inputUID').value;
+      const type = document.getElementById('inputCardType').value;
+      const sakMap = { 'MIFARE_1K': 0x08, 'MIFARE_UL': 0x04, 'MIFARE_4K': 0x18 };
+      ws.send(JSON.stringify({
+        type: 'trigger_nfc',
+        uid: uid,
+        sak: sakMap[type] || 0x08,
+        cardType: type
+      }));
+    }
+    
+    function forceDiag() {
+      ws.send(JSON.stringify({ type: 'force_gps_diag' }));
+    }
+    
+    // 模拟硬件对象（用于计算satTot）
+    const hardware = { gpsDiag: { satGP: 12, satBD: 6 } };
+  </script>
+</body>
+</html>

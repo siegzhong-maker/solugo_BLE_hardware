@@ -1,0 +1,14 @@
+{
+  "name": "esp32-c3-simulator-local",
+  "version": "1.0.0",
+  "description": "本地ESP32模拟器（带控制面板）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@abandonware/bleno": "^0.6.1",
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  }
+}
